@@ -1,5 +1,5 @@
 # Time Series
-## This project was focus on forecasting the number of visitors that the YellowStone park recieves yearly. Number of visitors is the main variable used but Gas and Weather were also added to understand their impacted in the forecast. R was the language used for this project.
+## This project was focused on forecasting the number of visitors that the YellowStone park recieves yearly. Number of visitors is the main variable used but Gas and Weather were also added to understand their impacted in the forecast. R was the language used for this project.
 
 ### Group Project:  composed by myself, Daniela Matinho, Claire Zhang, Sneha Vasudevan and Tim Chang
 
