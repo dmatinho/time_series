@@ -1,6 +1,6 @@
 # Time Series
 
-## Yellowstone is one of the most visited parks in the US with more than 4 million visitors a year. This translates in several problems: overcrowded spaces and insufficient resources. The goal of this project is to forecast the number of visitors per year to increase visitor’s satisfaction and, if possible better allocation of the park’s budget.
+Yellowstone is one of the most visited parks in the US with more than 4 million visitors a year. This translates in several problems: overcrowded spaces and insufficient resources. The goal of this project is to forecast the number of visitors per year to increase visitor’s satisfaction and, if possible better allocation of the park’s budget.
 
 ### Group Project:  composed by myself, Daniela Matinho, Claire Zhang, Sneha Vasudevan and Tim Chang
 
