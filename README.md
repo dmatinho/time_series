@@ -51,9 +51,11 @@ Looking at the correlation of the variables, temperature seems to be highly corr
 3.	VAR(1), VAR(2) the lag 2 values for all variables are added to the right side of equations: meaning 4 predictors
 4.	AICC gets the lower at lag 12 and we decided to procced with this one. Again, we test using gas and weather and like in the previous model we saw only gas impacts the number of visitors coming to the park.
 
-### Evaluation: Cross-validation cannot be directly used when dealing with time series data because we assume no relationship between variables.  time series cross validation yes
+### Evaluation
+Cross-validation cannot be directly used when dealing with time series data because we assume no relationship between variables.  time series cross validation yes
 Expanding: cumulative; Sliding: a window uses each time for the forecast
 Forecast: We evaluated each model using AICC and we compare models among different categories using RMSE and MAE (mean absolute error). In this case, best model is ARIMA (MAE) and VAR (RMSE). As we consider rmse a more accurate measure, the picked this model as the best one. 
 
-### Budget: Taking in account the forecast done, we note the number of visitors per month and we see that about 80% of visit the park during June-September, allowing us to say that the resources and money allocations may be according to this percentage.
+### Budget
+Taking in account the forecast done, we note the number of visitors per month and we see that about 80% of visit the park during June-September, allowing us to say that the resources and money allocations may be according to this percentage.
 Findings and Future work: The data is seasonal, and we found out that gasoline may not have an impact in the number of visitors as expected. Predictions are less accurate during winter months dur to less quantity of visitors. In the future, we can always try to find other variables and test on a weekly basis as well as find other ways to increase profits taking in account accurate forecasts. 
