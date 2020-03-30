@@ -1,5 +1,6 @@
 # Time Series
-## Project: Forecast number of visitors at YellowStone
+## This project was focus on forecasting the number of visitors that the YellowStone park recieves yearly. Number of visitors is the main variable used but Gas and Weather were also added to understand their impacted in the forecast. R was the language used for this project.
+
 ### Group Project:  composed by myself, Daniela Matinho, Claire Zhang, Sneha Vasudevan and Tim Chang
 
 Problem Statement: Yellowstone is one of the most visited parks in the US with more than 4 million visitors a year. This translates in several problems: overcrowded spaces and insufficient resources. The goal of this project is to forecast the number of visitors per year to increase visitor’s satisfaction and, if possible better allocation of the park’s budget.
