@@ -1,10 +1,14 @@
 # Time Series
 ## Project: Forecast number of visitors at YellowStone
-### Problem Statement: Yellowstone is one of the most visited parks in the US with more than 4 million visitors a year. This translates in several problems: overcrowded spaces and insufficient resources. The goal of this project is to forecast the number of visitors per year to increase visitor’s satisfaction and, if possible better allocation of the park’s budget.
+### Group Project:  composed by myself, Daniela Matinho, Claire Zhang, Sneha Vasudevan and Tim Chang
 
-### Data description: The data is from 1979 to 2018 and it is yearly data. There is a tiny upward trend and strong seasonality as we could expect from a national park. We split our data into train (39 years) and test (12 months) for the forecasts (why one year: this is a medium-term data so one to two years forecast should be enough).
+Problem Statement: Yellowstone is one of the most visited parks in the US with more than 4 million visitors a year. This translates in several problems: overcrowded spaces and insufficient resources. The goal of this project is to forecast the number of visitors per year to increase visitor’s satisfaction and, if possible better allocation of the park’s budget.
 
-### EDA: We start by analyzing the data in a decomposed way looking at the overall data, the trend, seasonality and the residuals. Applying decomposition in additive and multiplicative time series, we can see our data is better represented in this way. Especially, we see the residuals are more random when applying multiplicative. July is the month with the highest number of visitors and November through April is the lowest season. Lambda is applied to capture the variation of the data. In this case we see that once we apply box-cox the size of the variation is pretty much at the same level in all the years.
+### Data description
+The data is from 1979 to 2018 and it is yearly data. There is a tiny upward trend and strong seasonality as we could expect from a national park. We split our data into train (39 years) and test (12 months) for the forecasts (why one year: this is a medium-term data so one to two years forecast should be enough).
+
+### EDA
+We start by analyzing the data in a decomposed way looking at the overall data, the trend, seasonality and the residuals. Applying decomposition in additive and multiplicative time series, we can see our data is better represented in this way. Especially, we see the residuals are more random when applying multiplicative. July is the month with the highest number of visitors and November through April is the lowest season. Lambda is applied to capture the variation of the data. In this case we see that once we apply box-cox the size of the variation is pretty much at the same level in all the years.
 
 ### Holt-Winters
 1.	Holt: only takes care of the trend so this model is not good for our data
