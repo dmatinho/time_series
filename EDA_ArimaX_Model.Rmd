@@ -1,0 +1,588 @@
+---
+title: "YSP-project"
+author: "Claire"
+date: "3/8/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r echo = T, results = 'hide'}
+library("fma")
+library("fpp")
+library("forecast")
+library("MLmetrics")
+library("TSA")
+library("zoo")
+library(lubridate)
+library("ggplot2")
+library("MLmetrics")
+library("imputeTS")
+library("gdata")
+library("readxl")
+
+library("GGally")
+library("fma")
+library("fpp")
+library("forecast")
+#library("MLmetrics")
+library("TSA")
+library("zoo")
+library(lubridate)
+library("ggplot2")
+library(dplyr)
+```
+
+```{r}
+load(file = "/Users/yuanhongzhang/Downloads/ts_yellow_stone_park.Rdata")
+frequency(dfts)
+autoplot(dfts, main = "Number of Visitors to Yellow Stone National Park", 
+         xlab = "Year", ylab="Visitors")
+```
+
+```{r}
+decom <- decompose(dfts)
+plot(decom)
+decom_add <- decompose(dfts, type = c("additive"))
+plot(decom_add)
+decom_mul <- decompose(dfts, type = c("multiplicative"))
+plot(decom_mul)   
+# Upward linear trend with multiplicative seasonality
+
+```
+
+```{r}
+# The plot shows there is seasonal pattern exists in the data.
+seasonplot(dfts,  type = "o",
+            main="Seasonal Plot : Visitors to Yellow Stone Park", ylab = "Visitors",
+           xlab = "Month", col = 4)
+```
+
+```{r}
+tsdisplay(dfts)
+acf(dfts, 48 )
+pacf(dfts, 48)
+# From ACF and PACF plots, we can see that the data is not stationary. There are large positive values at lag of 1 and 12.
+# There are large negative values at lag of 5 and 6. This shows strong seasonality in the data.
+
+```
+
+
+```{r}
+# Test for data staionality 
+# Apply Augmented Dickey-Fuller test ( null:data is a non-stationary time series)
+#adf.test(dfts, alternative = c("stationary"))
+
+adf.test(dfts)
+adf.test(dfts)$p.value
+```
+
+```{r}
+#(KPSS) tests
+ktest <- kpss.test(dfts, null = c("Level", "Trend"))
+ktest
+ktest$p.value
+# As the p-value of the KPSS test is less than 0.05, we reject the null hypothesis that the data is stationary.
+# The null hypothesis of KPSS test is that the data is level or trend stationary.
+
+```
+
+```{r}
+# Perform necessary Data Transformation so that we can have stationary data
+# Is box-cox transformation necessary
+lam <- BoxCox.lambda(dfts)
+lam
+dfts %>% BoxCox(lambda = lam) %>% autoplot()
+
+
+```
+
+```{r}
+# Differencing
+sdiff <- nsdiffs(dfts)
+ndiffs(sdiff)
+# seasonal diff
+dff.1 <- diff(dfts, lag = 12, differences =1 )
+tsdisplay(dff.1, main="Seasonally Differenced")
+```
+```{r}
+# Test for stationality on differenced data
+adf.test(dff.1)
+
+#(KPSS) tests
+ktest.1 <- kpss.test(dff.1, null = c("Level", "Trend"))
+ktest.1
+ktest.1$p.value
+# diff.1 data is stationary
+
+acf(dff.1)
+```
+
+```{r}
+# seasonal diff then 1st order Normal Differencing
+dff.2 <- diff(dff.1, lag = 1, differences = 1)
+tsdisplay(dff.2, main="Seasonally Differenced then Normal Differenced")
+
+#However we might don't need the normal differencing because it seems over differencing
+```
+```{r}
+# Test for stationality on differenced data
+adf.test(dff.2)
+
+#(KPSS) tests
+ktest.2 <- kpss.test(dff.2, null = c("Level", "Trend"))
+ktest.2
+ktest.2$p.value
+
+# Both ADF and KPSS Test concludes that there is no significant evidence to reject the null-hypothesis that the data is level or trend stationary. Therefore the differenced data is level and trend stationary. 
+
+```
+
+
+```{r}
+cbind("Before Transformation" = dfts,
+      "Box-cox" = BoxCox(dfts, lambda = "auto"),
+      "Seasonally\n differenced Box-Cox" =
+        diff(BoxCox(dfts, lambda = "auto"),lag=12),
+      "Doubly\n differenced Box-Cox" =
+        diff(diff(BoxCox(dfts, lambda = "auto"),lag=12,differences =1 ),lag=1, differences = 1)) %>%
+  autoplot(facets=TRUE) +
+  xlab("Year") + ylab("") +
+  ggtitle("Number of Visitors to Yellow Stone Park")
+```
+
+```{r}
+head(dfts)
+train <- window(dfts, start = c(1979, 1), end = c(2017, 12), frequency = 12 )
+test <- window(dfts, start = c(2018, 1), end = c(2018, 12), frequency = 12 )
+
+```
+
+
+```{r}
+# Modeling
+
+# Benchmark model Seasonal Naive
+fc.snaive <- snaive(train, h=12)
+autoplot(fc.snaive)
+
+#check model fitness
+accuracy(fc.snaive)
+checkresiduals(fc.snaive, lag=12)
+
+# Plot actual vs forecasted values
+#df.snaive<- data.frame("test"= test, "estimate" = fc.snaive$mean )
+#ggplot(df.snaive, aes(x=test, y=estimate)) + geom_point()
+
+#check forecast errors
+error.1 <- test - fc.snaive$mean
+error.1
+autoplot(error.1)
+
+#check forecast errors
+MAPE(fc.snaive$mean, test)
+MSE(fc.snaive$mean, test)
+
+
+#  exponential smoothing : Holt-Winters seasonal method
+fit_hwa <- hw(train, seasonal ="additive")
+fit_hwa$model
+
+fit_hwm <- hw(train, seasonal ="multiplicative")
+fit_hwm$model
+
+fit_ets <- ets(train)
+fit_ets
+
+fit_ets_d <- ets(train, damped = TRUE)
+fit_ets_d
+
+```
+
+
+
+
+
+```{r}
+# Getting temperature and gas price data ready
+
+weather <- read.csv("/Users/yuanhongzhang/Downloads/2061985.csv")
+```
+
+```{r}
+#Read in weather data
+
+#Do a group by meaning the monthly values
+weather_groupby <- weather %>% group_by(DATE) %>% summarise(mean=mean(TAVG,na.rm=TRUE))
+#Recreate as dataframe
+temp_df <- (as.data.frame(weather_groupby))
+tempts <-  ts(temp_df[['mean']] , start=c(1979, 1), end = c(2018,12),frequency=12)
+
+dim(temp_df)
+head(temp_df)
+autoplot(tempts)
+```
+```{r}
+
+
+# # handling missing value
+# 
+# allmonths <- seq(from = min(temp$date), to = max(temp$date), by = "month")
+# 
+# 
+# temp_df <- merge(x=data.frame("date"=allmonths), y=temp, by="date" , all.x=TRUE)
+# 
+# tempts <-  ts(temp_df$avgTemp ,  start=c(1979, 1), end = c(2019,12), frequency = 12)
+# 
+# 
+# autoplot(tempts)
+# 
+# autoplot(na_seadec(tempts, algorithm = "interpolation"))
+# tempts_clean <- na_seadec(tempts, algorithm = "interpolation")
+# autoplot(tempts_clean)
+# 
+# # change temperature time series back to dataframe
+# temp_clean_df <- as.data.frame(as.numeric(tempts_clean))
+# dim(temp_clean_df)
+
+# split temperature into train, test, fore
+temp_train <- temp_df$mean[1:468]
+dim(temp_train) <- c(468,1)
+
+
+
+temp_test <- temp_df$mean[469:480]
+dim(temp_test) <- c(12,1)
+
+save(tempts, file= "/Users/yuanhongzhang/Documents/UChicago/Winter 2020/Time Series/Project/ts_temperature.Rdata")
+
+tempts_train <- window(tempts, start = c(1979, 1), end = c(2017,12), frequency = 12)
+tempts_test <- window(tempts, start = c(2018, 1), end = c(2018,12), frequency = 12)
+
+#tempts_fore <- window(tempts, start = c(2019, 1), end = c(2019,12), frequency = 12)
+
+
+```
+
+
+
+```{r}
+# load gas price data
+
+
+gas_df <- read_excel("/Users/yuanhongzhang/Downloads/gasoline.xlsx")
+
+```
+
+```{r}
+dim(gas_df)
+
+gas_train_df <- gas_df[gas_df$Month <= "2017-12-01",]
+gas_test_df <- gas_df[gas_df$Month > "2017-12-01",]
+
+gas_train <- gas_train_df$`Unleaded Regular Gasoline - U.S. City Average Retail Price`
+dim(gas_train) <- c(468,1)
+
+gas_test <- gas_test_df$`Unleaded Regular Gasoline - U.S. City Average Retail Price`
+dim(gas_test) <- c(12,1)
+
+
+gas_ts <- ts(gas_df$`Unleaded Regular Gasoline - U.S. City Average Retail Price` ,  start=c(1979, 1), end = c(2018,12), frequency = 12)
+gas_ts
+
+# forecast gas price for next year 2019
+gas_fore <- rwf(gas_ts, h = 12, drift = TRUE)
+autoplot(gas_fore)
+gas_fore$mean
+
+autoplot(gas_ts)
+
+gasts_train <- window(gas_ts, start = c(1979, 1), end = c(2017,12), frequency = 12)
+gasts_test <- window(gas_ts, start = c(2017, 1), end = c(2018,12), frequency = 12)
+
+```
+
+
+
+```{r}
+# prepare xreg for Arimax
+xreg_train <- cbind(temp_train, gas_train)
+xreg_test <- cbind(temp_test, gas_test)
+
+```
+
+
+```{r}
+plot( temp_train, train,type="p" , main ="Number of Visitors vs Temperature", pch = 16,col = "blue", xlab= "temperature", ylab="Number of Visitors")
+cor(train, temp_train)
+
+plot( gas_train,train, type="p" , main ="Number of Visitors vs Gas Price", pch = 16,col = "blue", xlab= "GasPrice", ylab="Number of Visitors")
+cor(train, gas_train) 
+
+
+
+
+```
+
+
+```{r}
+# combining visitors, temperature and gas price into one single dataframe
+training_df <- as.data.frame(cbind(as.numeric(train), temp_train, gas_train))
+test_df <- as.data.frame(cbind(as.numeric(test), temp_test, gas_test))
+
+colnames(training_df) <- c("Visitors","Temperature","GasPrice")
+colnames(test_df) <- c("Visitors","Temperature","GasPrice")
+
+
+lambda_v <- BoxCox.lambda(train)
+lambda_v
+autoplot(log(train))
+autoplot(BoxCox(train, lambda = lambda_v))
+
+# correlations
+training_df  %>%
+  GGally::ggpairs(columns = c("Temperature","GasPrice","Visitors"))
+
+```
+
+
+```{r}
+# prepare train time series
+training_ts <- ts(data = training_df, start= c(1979,1), end=c(2017,12), frequency = 12)
+test_ts <- ts(data = test_df, start= c(2018,1), end=c(2018,12), frequency = 12)
+head(training_ts)
+```
+
+
+
+
+
+```{r}
+#tslm() model - visitors~ temperature
+fit_tslm_temp <- tslm(Visitors~Temperature, data = training_ts)
+summary(fit_tslm_temp)
+```
+
+
+```{r}
+plot(temp_train, train, type="p" , main ="Number of Visitors vs Temperature", pch = 16, col = "blue", xlab= "temperature", ylab="Number of Visitors")
+abline(fit_tslm_temp$coefficients[1],fit_tslm_temp$coefficients[2], lwd=2)
+```
+
+```{r}
+checkresiduals(fit_tslm_temp, test="LB")
+```
+
+```{r}
+fc_tslm_temp <- forecast(fit_tslm_temp, newdata=data.frame(Temperature = test_ts[,"Temperature"]), h=12)
+plot(fc_tslm_temp)
+accuracy(fc_tslm_temp, test)
+```
+
+
+```{r}
+fit_tslm_gas <- tslm(Visitors~GasPrice, data = training_ts)
+
+summary(fit_tslm_gas)
+
+plot( gas_train, train, type="p" , main ="Number of Visitors vs Gas Price", pch = 16, col = "blue", xlab= "Gas Price", ylab="Number of Visitors")
+abline(fit_tslm_gas$coefficients[1],fit_tslm_temp$coefficients[2], lwd=2)
+
+checkresiduals(fit_tslm_gas, test="LB")
+```
+
+```{r}
+fc_tslm_gas <- forecast(fit_tslm_gas, newdata=data.frame(GasPrice = test_ts[,"GasPrice"]), h=12)
+plot(fc_tslm_gas)
+accuracy(fc_tslm_gas, test)
+```
+
+```{r}
+fit_tslm_both <- tslm(Visitors~Temperature+GasPrice, data = training_ts)
+summary(fit_tslm_both)
+checkresiduals(fit_tslm_both, test="LB")
+
+```
+
+
+```{r}
+fc_tslm_both <- forecast(fit_tslm_both, newdata=data.frame(Temperature = test_ts[,"Temperature"],GasPrice= test_ts[,"GasPrice"]), h=12)
+plot(fc_tslm_both)
+accuracy(fc_tslm_both, test)
+```
+
+```{r}
+rbind(accuracy(fc_tslm_both, test),accuracy(fc_tslm_gas, test), accuracy(fc_tslm_temp, test))
+```
+
+```{r}
+lambda_v <- BoxCox.lambda(train)
+lambda_v
+autoplot(log(train))
+autoplot(BoxCox(train, lambda = lambda_v))
+```
+
+
+
+AutoARIMA for ARIMAX
+```{r}
+# Autoarima
+#xreg = Temperature and gas price
+# xreg = Temperature and gas price
+fit_autoarimax_gas_temp <- auto.arima(y = train, D=1,  stepwise=FALSE , approximation=FALSE,xreg =xreg_train,  seasonal = TRUE , lambda = lambda_v)
+summary(fit_autoarimax_gas_temp)
+
+# check p-values of model parameters
+(1-pnorm(abs(fit_autoarimax_gas_temp$coef)/sqrt(diag(fit_autoarimax_gas_temp$var.coef))))*2
+
+checkresiduals(fit_autoarimax_gas_temp)
+
+# xreg = Temperature only
+fit_autoarimax_temp <- auto.arima(y = train, D=1,  xreg =temp_train, stepwise=FALSE , approximation=FALSE,  seasonal = TRUE , lambda = lambda_v )
+summary(fit_autoarimax_temp)
+# check p-values of model parameters
+(1-pnorm(abs(fit_autoarimax_temp$coef)/sqrt(diag(fit_autoarimax_temp$var.coef))))*2
+
+checkresiduals(fit_autoarimax_temp)
+
+# xreg = Temperature only
+fit_autoarimax_gas <- auto.arima(y = train, D=1,  xreg =gas_train, stepwise=FALSE , approximation=FALSE,  seasonal = TRUE , lambda = lambda_v )
+summary(fit_autoarimax_gas)
+# check p-values of model parameters
+(1-pnorm(abs(fit_autoarimax_gas$coef)/sqrt(diag(fit_autoarimax_gas$var.coef))))*2
+checkresiduals(fit_autoarimax_gas)
+
+```
+
+```{r}
+# # fit modesls on test dataset
+# fc_arima <- forecast(fit_arima, h=12)
+# autoplot(fc_arima ) + xlab("Month") + ylab("Average Visitors") + title(main = "ARIMA Model")
+
+fc_autoarimax_gas_temp <- forecast(fit_autoarimax_gas_temp, xreg = xreg_test, h=12)
+autoplot(fc_autoarimax_gas_temp ) + xlab("Month") + ylab("Average Visitors")
+
+
+fc_autoarimax_temp <- forecast(fit_autoarimax_temp, xreg = temp_test, h=12)
+autoplot(fc_autoarimax_temp ) + xlab("Month") + ylab("Average Visitors")
+
+fc_autoarimax_gas <- forecast(fit_autoarimax_gas, xreg = gas_test, h=12)
+autoplot(fc_autoarimax_gas ) + xlab("Month") + ylab("Average Visitors")
+
+```
+
+```{r}
+accuracy(fc_autoarimax_gas_temp, test)
+#check forecast errors
+MAPE(fc_autoarimax_gas_temp$mean, test)
+MSE(fc_autoarimax_gas_temp$mean, test)
+
+# Looking metrics
+accuracy(fc_autoarimax_temp, test)
+#check forecast errors
+MAPE(fc_autoarimax_temp$mean, test)
+MSE(fc_autoarimax_temp$mean, test)
+
+# Looking metrics
+accuracy(fc_autoarimax_gas, test)
+#check forecast errors
+MAPE(fc_autoarimax_gas$mean, test)
+sqrt(MSE(fc_autoarimax_gas$mean, test))
+
+
+c(
+  sqrt(MSE(fc_autoarimax_gas_temp$mean, test)),
+  sqrt(MSE(fc_autoarimax_temp$mean, test)),
+  sqrt(MSE(fc_autoarimax_gas$mean, test)))
+
+
+```
+
+
+```{r}
+# xreg = Temperature and gas price
+fit_Arimax_gas_temp <- Arima(y = train, order = c(1, 0, 2), seasonal = list(order = c(0, 1, 1),  period = 12), xreg =xreg_train,   lambda = lambda_v)
+summary(fit_Arimax_gas_temp)
+
+# check p-values of model parameters
+(1-pnorm(abs(fit_Arimax_gas_temp$coef)/sqrt(diag(fit_Arimax_gas_temp$var.coef))))*2
+
+checkresiduals(fit_Arimax_gas_temp)
+
+# xreg = Temperature only
+fit_Arimax_temp <- Arima(y = train, order = c(1, 0, 2), seasonal = list(order = c(0, 1, 1),  period = 12),  xreg =temp_train,  lambda = lambda_v )
+summary(fit_Arimax_temp)
+# check p-values of model parameters
+(1-pnorm(abs(fit_Arimax_temp$coef)/sqrt(diag(fit_Arimax_temp$var.coef))))*2
+
+checkresiduals(fit_Arimax_temp)
+
+# xreg = Temperature only
+fit_Arimax_gas <- Arima(y = train, order = c(1, 0, 2), seasonal = list(order = c(0, 1, 1),  period = 12),  xreg =gas_train,  lambda = lambda_v )
+summary(fit_Arimax_gas)
+# check p-values of model parameters
+(1-pnorm(abs(fit_Arimax_gas$coef)/sqrt(diag(fit_Arimax_gas$var.coef))))*2
+checkresiduals(fit_Arimax_gas)
+```
+
+```{r}
+# # fit modesls on test dataset
+# fc_arima <- forecast(fit_arima, h=12)
+# autoplot(fc_arima ) + xlab("Month") + ylab("Average Visitors") + title(main = "ARIMA Model")
+
+fc_Arimax_gas_temp <- forecast(fit_Arimax_gas_temp, xreg = xreg_test, h=12)
+autoplot(fc_Arimax_gas_temp ) + xlab("Month") + ylab("Average Visitors")
+
+fc_Arimax_temp <- forecast(fit_Arimax_temp, xreg = temp_test, h=12)
+autoplot(fc_Arimax_temp ) + xlab("Month") + ylab("Average Visitors")
+
+fc_Arimax_gas <- forecast(fit_Arimax_gas, xreg = gas_test, h=12)
+autoplot(fc_Arimax_gas ) + xlab("Month") + ylab("Average Visitors")
+
+
+
+
+
+
+```
+
+```{r}
+ accuracy(fc_Arimax_gas_temp, test)
+
+ # Looking metrics
+ rbind(accuracy(fc_Arimax_gas_temp, test),
+       accuracy(fc_Arimax_temp, test),
+       accuracy(fc_Arimax_gas, test))
+ 
+ # get rmse
+modelRMSE <- c(accuracy(fc_autoarimax_gas_temp, test)["Test set",2], accuracy(fc_autoarimax_temp, test)["Test set",2], accuracy(fc_autoarimax_gas, test)["Test set",2],
+               accuracy(fc_Arimax_gas_temp, test)["Test set",2], accuracy(fc_Arimax_temp, test)["Test set",2], accuracy(fc_Arimax_gas, test)["Test set",2])
+
+
+# get mape
+modelMAPE <- c(accuracy(fc_autoarimax_gas_temp, test)["Test set",5], accuracy(fc_autoarimax_temp, test)["Test set",5], accuracy(fc_autoarimax_gas, test)["Test set",5],
+               accuracy(fc_Arimax_gas_temp, test)["Test set",5], accuracy(fc_Arimax_temp, test)["Test set",5], accuracy(fc_Arimax_gas, test)["Test set",5])
+
+
+
+# get AICC
+modelaicc <- c(round(fit_autoarimax_gas_temp$aicc,2), round(fit_autoarimax_temp$aicc,2), round(fit_autoarimax_gas$aicc, 2),     round(fit_Arimax_gas_temp$aicc,2), round(fit_Arimax_temp$aicc, 2), round(fit_Arimax_gas$aicc,2))
+modelaicc
+
+
+modelname <- c("autoarimax_both","autoarimax_temp","autoarimax_gas","Arimax_both","Arimax_temp","Arimax_gas")
+test_error <- as.data.frame( cbind(modelname,modelRMSE , modelMAPE, modelaicc)  )
+colnames(test_error) <- c("Models", "RMSE","MAPE" ,"AICc")
+test_error
+
+```
+
+```{r}
+
+
+
+
+```

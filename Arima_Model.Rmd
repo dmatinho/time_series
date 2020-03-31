@@ -1,0 +1,450 @@
+---
+title: "Final_Project"
+author: "Sneha Vasudevan"
+date: "2/29/2020"
+output: html_document
+---
+
+
+```{r results='hide', message=FALSE, warning=FALSE}
+library(fpp)
+library(tseries)
+library(ggplot2)
+library(forecast)
+library(zoo)
+library(xts)
+library(dygraphs)
+library(TSA)
+library(dplyr)
+#library(tidyr)
+library(readxl)
+library(imager)
+#install.packages("vars", repo = "https://lib.ugent.be/CRAN/")
+library(vars)
+#install.packages("MLmetrics")
+#library(MLmetrics)
+install.packages("Metrics")
+library(Metrics)
+```
+
+
+
+
+```{r}
+dataset<-readRDS("C:/Users/snev8/Desktop/Time Series/FINAL PROJECT/CODE/ts_yellow_stone_park.rds", refhook = NULL)
+#View(dataset)
+print(dataset)
+```
+
+
+
+```{r}
+#plot(ts(dataset, frequency = 12, start = c(1979, 12)), ylim = c(2000, 10000000), col = "green")
+plot.ts(dataset,main = "No.Of Visitors",col="red", ylab="No.of Visitors", xlab="Years", ylim=c(2000,1000000))
+ggtsdisplay(dataset,main='No.Of Visitors')
+```
+
+**We can see a seasonal pattern in the time series plot, and a variance in magnitude. 
+
+```{r}
+acf(dataset,100)
+```
+
+```{r}
+#splitting train and  test ( 32 years train, 8 years test)
+Train<-window(dataset, start=c(1979,1), end=c(2017,12),frequency = 12) 
+Test<-window(dataset, start=c(2018,1), end=c(2018,12),frequency = 12) 
+```
+
+
+ACF plots shows a seasonal pattern as well.
+
+```{r}
+lambda <- BoxCox.lambda(Train)
+lambda
+dataset_transform <- BoxCox(dataset,lambda)
+```
+
+```{r}
+Train_xf<-window(dataset_transform,start=c(1979,1), end=c(2017,12),frequency = 12)
+#Train_xf
+Test_xf<-window(dataset_transform, start=c(2018,1), end=c(2018,12),frequency = 12) 
+#Test_xf
+```
+
+
+```{r}
+ts1<-dataset # initial time series data
+ts2<-dataset_transform #transformed time series data
+tsm<-cbind(ts1,ts2) 
+tsm<-ts(tsm,start=c(1979,1),end=c(2018,12), frequency = 12)
+plot.ts(ts1,main="No.Of Visitors in YellowStone NP",xlab="Year",ylab="No.Of Visitors")
+plot.ts(ts2,main="No.Of Visitors in YellowStone NP (Transformed)",xlab="Year",ylab="No.Of Visitors")
+```
+
+
+
+
+
+```{r}
+#Plotting Train dataset
+#plot.ts(Train,main = "No.Of Visitors(Train Data)",col="red", ylab="No.of Visitors", xlab="Years", ylim=c(2000,1000000))
+plot.ts(Train_xf,main = "No.Of Visitors(Train Data)",col="red", ylab="No.of Visitors", xlab="Years")
+ggtsdisplay(Train_xf,main='No.Of Visitors')
+```
+
+```{r}
+acf(Train_xf,60)
+```
+
+
+```{r}
+#Plotting Test dataset
+#plot.ts(Test,main = "No.Of Visitors(Test Data)",col="red", ylab="No.of Visitors", xlab="Years", ylim=c(2000,1000000))
+#ggtsdisplay(Test,main='No.Of Visitors')
+#plot.ts(Test_xf,main = "No.Of Visitors(Test Data)",col="red", ylab="No.of Visitors", xlab="Years")
+#ggtsdisplay(Test_xf,main='No.Of Visitors')
+```
+
+
+
+**Performing KPSS test to also ensure stationarity** 
+KPSS Test :
++  H0 (Null Hypothesis) : time series is a level or trend stationary univariate time series
++  H1 (Alternate Hypothesis) : time series is NOT a level or trend stationary univariate
+time series
+
+```{r}
+kpss.test(Train_xf,null = c("Level", "Trend"))
+```
+
+P value ==> 0.1>0.05==> Therefore, we accept null hypothesis, which is that the time series **is stationary**
+
+**Augmented Dickey-Fuller Test :** 
+
++  H0 (Null Hypothesis) : time series is **NOT** a level or trend stationary univariate time series
++  H1 (Alternate Hypothesis) :time series is a level or trend stationary univariate time series  
+
+```{r}
+adf.test(Train_xf)
+```
+
+P value ==> 0.01<0.05==> Therefore, we reject null hypothesis and accept alternate hypothesis, which is that the time series **is stationary**
+
+**Even though the above two tests say the data is stationary, we can see from the ACF plot that that is not the case. There is a seasonal pattern which needs to be extracted from the data to improve modelling. We will proceed with differencing to remove the seasonal pattern. 
+
+
+
+```{r}
+#Normal Differencing - First order 
+sdiff0_ndiff1<-diff(Train_xf, differences=1) 
+ggtsdisplay(sdiff0_ndiff1,main= "First Order Normal Differencing")
+acf(sdiff0_ndiff1)
+```
+
+There is a seasonal pattern per the ACF plot after normal differencing of order 1. From the data is clear that the seasonal data exists and has a frequency of 12, implying yearly seasonality. So you see spikes at those lags. 
+
+
+```{r}
+#Normal Differencing - Second order 
+sdiff0_ndiff2<-diff(Train_xf, differences=2) 
+ggtsdisplay(sdiff0_ndiff2,main= "Second Order Normal Differencing")
+acf(sdiff0_ndiff2)
+```
+
+The ACF is better than the previous plot, however, there is still seasonality that exists which isnt removed even after second order differencing. We still see spikes at lag 12, 24, 36 etc. Stopping with normal differning, Instead proceeding with seasonal differencing to see if that will help get rid of autocorrelation in the seasonal lags. 
+
+
+
+
+
+```{r}
+#Seasonal Differencing - First order 
+sdiff1_ndiff0<-diff(Train_xf, differences=1,lag = 12) 
+ggtsdisplay(sdiff1_ndiff0,main= "First Order Seasonal Differencing")
+acf(sdiff1_ndiff0,60)
+#View(sdiff1_ndiff0)
+```
+
+The above plot looks better than the first order normal differencing, right? We still see a spike at lag = 12, but at lags = 24 and 36, the ACF is insignificant. 
+
+If we look at the above ACF and PACF plots, we see this : 
+
+
+**ACF & PACF Plot Inference :**
+
+#+ Exponential decrease at lag=1 in ACF plot, implying AR(1), sharp cut off after seasonal lag of order =1 (ie lag 12) Indicative of non-seasonalMA(1) due to exponential decrease. 
+#+ Spike at lag = 12, after which there is a sudden drop. Indicative of a MA(1) seasonal 
+
+
+#Significant spike at lag = 1. This is suggestive of non-seasonal MA(1) component. Significant spike at lag =12 is indicative of seasonal MA(1). MA because if you look at the PACF, there is a sharp drop/ cut off at after lag =1. 
+
+
+**Looking at the above plot, its indicative of a SARIMA (1,0,0)(0,1,1)[12] model** 
+
+
+
+```{r}
+kpss.test(sdiff1_ndiff0,null = c("Level", "Trend"))
+adf.test(sdiff1_ndiff0)
+```
+
+
+```{r}
+#Seasonal Differencing - Second order 
+sdiff2_ndiff0<-diff(Train_xf, differences=2,lag = 12) 
+ggtsdisplay(sdiff2_ndiff0,main= "Second Order Seasonal Differencing")
+acf(sdiff2_ndiff0,60)
+```
+
+If we compare second order differencing with first order differencing, we can see that the plots are similar. While the ACF values for insignificant lags become even more insignificant, the significant lags remain the same, which tells us that second order seasonal differencing may not be worth it. 
+
+
+
+Since seasonality is strong, it is recommended that seasonal differencing be done first because sometimes the resulting series will be stationary and there will be no need for further
+first difference. 
+```{r}
+#Seasonal Differencing & normal differencing - Fist order 
+sdiff1_ndiff0<-diff(Train_xf, differences=1,lag = 12) # did seasonal differencing first followed by normal differencing. 
+sdiff1_ndiff1<-diff(sdiff1_ndiff0,differences=1)
+ggtsdisplay(sdiff1_ndiff1,main= "Seasonal Differencing & normal differencing - First order")
+acf(sdiff1_ndiff1,60)
+```
+
+These plots are far worse than those for single order seasonal differencing. Visualizing all these plots, I've decided to pursue first order seasonal differencing as the differencing of choice. 
+
+
+
+```{r}
+#Model 1 : (1,0,0)(0,1,1)[12]
+model1<-Arima(Train,order=c(1,0,0),seasonal=list(order=c(0,1,1),period=12),lambda = lambda)
+summary(model1)
+checkresiduals(model1)
+autoplot(model1)
+```
+
+
+
+```{r}
+model1_forecast <- forecast(model1,h = 12)
+autoplot(model1_forecast)+ xlab("Year") +
+ylab("Number of Visitors")
+model1_forecast_accuracy <- accuracy(model1_forecast$mean, Test)
+model1_forecast_accuracy
+```
+
+
+
+
+
+```{r}
+model1_RMSE<-model1_forecast_accuracy[2]
+model1_RMSE
+model1_MAPE<-model1_forecast_accuracy[5]
+model1_MAPE
+```
+
+```{r}
+model1_forecast_error<-Test-(model1_forecast$mean)
+autoplot(model1_forecast_error)
+```
+
+
+
+```{r}
+#RMSE_Calculation_model1<-sqrt((model1_forecast_error^2))
+#RMSE_Calculation_model1
+#MAPE_Calculation_model1<-(abs((Test-model1_forecast$mean)/Test))*100
+#MAPE_Calculation_model1
+```
+
+
+
+```{r}
+#Model 2 : (1,0,0)(1,1,1)[12]
+model2<-Arima(Train,order=c(1,0,0),seasonal=list(order=c(1,1,1),period=12),lambda = lambda)
+summary(model2)
+checkresiduals(model2)
+```
+
+
+
+```{r}
+model2_forecast <- forecast(model2,h = 12)
+autoplot(model2_forecast)+ xlab("Year") +
+ylab("Number of Visitors")
+model2_forecast_accuracy <- accuracy(model2_forecast$mean, Test)
+model2_forecast_accuracy
+```
+
+
+
+
+
+```{r}
+#Model 3 : (1,0,0)(0,1,2)[12]
+model3<-Arima(Train,order=c(1,0,0),seasonal=list(order=c(0,1,2),period=12),lambda = lambda)
+summary(model3)
+checkresiduals(model3)
+```
+
+
+```{r}
+model3_forecast <- forecast(model3,h = 12)
+autoplot(model3_forecast)+ xlab("Year") +
+ylab("Number of Visitors")
+model3_forecast_accuracy <- accuracy(model3_forecast$mean, Test)
+model3_forecast_accuracy
+```
+
+
+```{r}
+#Model 4 : (1,0,1)(0,1,1)[12]
+model4<-Arima(Train,order=c(1,0,1),seasonal=list(order=c(0,1,1),period=12),lambda = lambda)
+summary(model4)
+checkresiduals(model4)
+```
+
+
+
+
+```{r}
+model4_forecast <- forecast(model4,h = 12)
+autoplot(model4_forecast)+ xlab("Year") +
+ylab("Number of Visitors")
+model4_forecast_accuracy <- accuracy(model4_forecast$mean, Test)
+model4_forecast_accuracy
+```
+
+
+
+
+```{r}
+#Model 5 : (2,0,1)(0,1,1)[12]
+model5<-Arima(Train,order=c(2,0,1),seasonal=list(order=c(0,1,1),period=12),lambda = lambda)
+summary(model5)
+checkresiduals(model5)
+```
+
+
+```{r}
+model5_forecast <- forecast(model5,h = 12)
+autoplot(model5_forecast)+ xlab("Year") +
+ylab("Number of Visitors")
+model5_forecast_accuracy <- accuracy(model5_forecast$mean, Test)
+model5_forecast_accuracy
+```
+
+
+
+```{r}
+#Model 6 : (1,0,2)(0,1,1)[12]
+model6<-Arima(Train,order=c(1,0,2),seasonal=list(order=c(0,1,1),period=12),lambda = lambda)
+summary(model6)
+checkresiduals(model6)
+```
+
+
+```{r}
+model6_forecast <- forecast(model6,h = 12)
+autoplot(model6_forecast)+ xlab("Year") +
+ylab("Number of Visitors")
+model6_forecast_accuracy <- accuracy(model6_forecast$mean, Test)
+model6_forecast_accuracy
+```
+
+
+```{r}
+#model6_forecast_error<-Test-(model6_forecast$mean)
+#autoplot(model6_forecast_error)
+```
+
+
+
+
+
+```{r}
+RMSE_model <- matrix(NA,1,12) 
+MAPE_model <- matrix(NA,1,12)
+for(i in 1:12){
+model6
+model_forecast 
+MAPE_model[i,1:length(Test)] <- mape(model_forecast[['mean']],Test)
+RMSE_model[i,1:length(Test)] <- rmse(model_forecast[['mean']],Test)
+}
+
+```
+
+
+
+
+
+
+
+
+```{r}
+#Model 7 : (1,0,2)(1,1,1)[12]
+model7<-Arima(Train,order=c(1,0,2),seasonal=list(order=c(1,1,1),period=12),lambda = lambda)
+summary(model7)
+checkresiduals(model7)
+```
+
+
+
+
+```{r}
+model7_forecast <- forecast(model7,h = 12)
+autoplot(model7_forecast)+ xlab("Year") +
+ylab("Number of Visitors")
+model7_forecast_accuracy <- accuracy(model7_forecast$mean, Test)
+model7_forecast_accuracy
+```
+
+
+```{r}
+arima_model<-auto.arima(Train, D=1, max.p = 2, max.q = 2, max.P= 2, max.Q=2,seasonal=TRUE,approximation = FALSE, trace=TRUE,ic = c("aicc", "aic", "bic"), stepwise = FALSE, lambda = lambda,allowdrift = FALSE)
+summary(arima_model)
+```
+
+
+
+
+
+
+```{r}
+#Model 8 : (1,0,2)(1,1,2)[12]
+model8<-Arima(Train,order=c(1,0,2),seasonal=list(order=c(1,1,2),period=12),lambda = lambda)
+summary(model8)
+checkresiduals(model8)
+```
+
+
+
+```{r}
+model8_forecast <- forecast(model8,h = 12)
+autoplot(model8_forecast)+ xlab("Year") +
+ylab("Number of Visitors")
+model8_forecast_accuracy <- accuracy(model8_forecast$mean, Test)
+model8_forecast_accuracy
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

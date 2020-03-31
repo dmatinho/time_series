@@ -1,0 +1,80 @@
+---
+title: "daniela_model"
+output: html_document
+---
+
+
+```{r }
+path <-"C:/Users/danie/OneDrive/Documents/ChicagoUni_MSA/Courses/Winterquarter2019/TimeSeries/Project/nps-yellowstone-np"
+```
+
+```{r}
+ts_yellow_stone_park <- readRDS("~/ChicagoUni_MSA/Courses/Winterquarter2019/TimeSeries/Project/nps-yellowstone-np/ts_yellow_stone_park.rds")
+ts_yellow_stone_park
+```
+
+```{r}
+train<- window(ts_yellow_stone_park, c(1979,1), c(2017, 12))
+test<- window(ts_yellow_stone_park, c(2018, 1), c(2018,12))
+```
+
+
+```{r setup, include=FALSE}
+m_multiDamped <- hw(train,seasonal = "multiplicative",h=12, damped = TRUE) # or ?HoltWinters
+m_multiDamped
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(m_multiDamped)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+m_multiDamped$model$aicc
+```
+
+```{r}
+MAPE(m_multiDamped$mean, test)
+
+sqrt(MSE(m_multiDamped$mean, test))
+```
+
+
+```{r}
+lambda_ts<- BoxCox.lambda(train)
+lambda_ts
+
+```
+
+```{r}
+model_ets2<-ets(train, lambda = lambda_ts)
+model_ets2
+```
+
+
+```{r}
+model_ets2$aicc
+```
+
+### Once we transformed eh data, the aicc is way lower compared to non transformed data
+
+```{r}
+
+forecast_ets2<-forecast(model_ets2 ,h=12)
+forecast_ets2
+```
+
+```{r}
+MAPE(forecast_ets2$mean, test)
+sqrt(MSE(forecast_ets2$mean, test))
+```
+

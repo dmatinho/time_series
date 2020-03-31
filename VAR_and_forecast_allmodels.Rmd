@@ -1,0 +1,435 @@
+---
+title: "YellowStone"
+author: "Timothy Chang"
+date: "2/28/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+library("fma")
+library("fpp")
+library("forecast")
+#library("MLmetrics")
+library("TSA")
+library("zoo")
+library(lubridate)
+library("ggplot2")
+library(dplyr)
+```
+
+
+```{r claire1}
+df <- read.csv("~/Documents/2020 Time Series/Final/FINAL_CLEAN_DATASET.csv")
+dft <-  ts(as.numeric(gsub('[,]', '', (as.character(df[['Visitors']])))) ,  start=c(1979, 1), end = c(2018,12),frequency = 12)
+dft
+autoplot(dft)
+acf(dft)
+
+decom <- decompose(dft, type = c("multiplicative"))
+plot(decom)   
+```
+
+
+```{r claire2}
+seasonplot(dft,  type = "o",
+            main="Seasonal Plot : Visitors to Yellow Stone Park", ylab = "Visitors",
+           xlab = "Month", col = 4)
+
+monthplot(dft)
+
+tsdisplay(dft)
+acf(dft)
+pacf(dft)
+```
+
+```{r claire3}
+# Test for data staionality 
+# Apply Augmented Dickey-Fuller test
+adf.test(dft)
+
+#(KPSS) tests
+ktest <- kpss.test(dft, null = c("Level", "Trend"))
+ktest
+ktest$p.value
+# Based on the result of KPSS test, we reject the null hypothesis that the data is stationary.
+
+
+# Perform necessary Data Transformation so that we can have stationary data
+# Is box-cox transformation necessary
+lam <- BoxCox.lambda(dft)
+lam
+dft %>% BoxCox(lambda = lam) %>% autoplot()
+
+# Differencing
+nsdiffs(dft)
+ndiffs(dft)
+
+dff.1 <- diff(dft, lag = 12, differences =1 )
+tsdisplay(dff.1, main="Seasonally Differenced")
+
+# Normal Differencing
+dff.2 <- diff(dff.1, lag = 1, differences = 1)
+tsdisplay(dff.2, main="Seasonally Differenced then Normal Differenced")
+
+cbind("Before Transformation" = dft,
+      "Box-cox" = BoxCox(dft, lambda = "auto"),
+      "Seasonally\n differenced Box-Cox" =
+        diff(BoxCox(dft, lambda = "auto"),12),
+      "Doubly\n differenced Box-Cox" =
+        diff(diff(BoxCox(dft, lambda = "auto"),12),1)) %>%
+  autoplot(facets=TRUE) +
+  xlab("Year") + ylab("") +
+  ggtitle("Number of Visitors to Yellow Stone Park")
+
+# Test for stationality on differenced data
+adf.test(dff.2)
+
+#(KPSS) tests
+ktest.2 <- kpss.test(dff.2, null = c("Level", "Trend"))
+ktest.2
+ktest.2$p.value
+```
+
+
+```{r tim_1}
+#Read in data
+df <- read.csv("~/Documents/2020 Time Series/Final/FINAL_CLEAN_DATASET.csv")
+
+#Read in weather data
+weather <- read.csv("~/Documents/2020 Time Series/Final/2061985.csv")
+#Do a group by meaning the monthly values
+weather_groupby <- weather %>% group_by(DATE) %>% summarise(mean=mean(TAVG,na.rm=TRUE))
+#Recreate as dataframe
+weatherdf <- (as.data.frame(weather_groupby))
+
+#Create time series (need to transform string variable)
+dft <-  ts(as.numeric(gsub('[,]', '', (as.character(df[['Visitors']])))) ,  start=c(1979, 1), end = c(2018,12),frequency = 12)
+wdft <-  ts(weatherdf[['mean']] , start=c(1979, 1), end = c(2018,12),frequency=12)
+
+autoplot(dft)
+autoplot(wdft)
+```
+
+```{r tim_2}
+# Create linear model
+# log the visitors because of wide range (compared to weather)
+log_dft <- log(dft)
+fit <- tslm(log_dft ~ (wdft))
+
+#Plot the log cpi and cost as well as the fitted trend
+plot(log_dft,(wdft))
+
+#summary and check residuals
+summary(fit)
+checkresiduals(fit)
+```
+
+```{r tim_3}
+#use autoarima to come up with best modelfor arimax
+arimax_model <- auto.arima(dft,xreg=wdft,D=1,lambda=NULL)
+
+#check our model
+summary(arimax_model)
+checkresiduals(arimax_model)
+
+#Forecast after finding using naive method for predicting weatger
+naive_24mon <- rep(mean(wdft[(length(wdft)-24):length(wdft)]),24)
+
+#forecast and plot
+fcst_arima <- forecast(arimax_model,xreg=naive_24mon,h=24)
+plot(fcst_arima)
+```
+
+```{r tim4}
+# Create Var Model
+var_model <- VAR(cbind(dft,wdft), p = 12, type = "both",season=12)
+
+fcst <- forecast(var_model,h=24)
+plot(fcst)
+
+acf(residuals(var_model)[,1])
+acf(residuals(var_model)[,2])
+```
+
+
+```{r tim5}
+arima_model <- auto.arima(dft)
+summary(arima_model)
+```
+
+
+```{r tim6}
+k <- 360 # minimum data length 
+n <- length(dft) # data points
+p <- 12 # Period
+H <- 24 # Forecast Horiz
+
+lambda_ts <- BoxCox.lambda(dft)
+
+st <- tsp(dft)[1]+(k-2)/p
+
+mae_1 <- matrix(NA,n-k-H,H)
+mae_2 <- matrix(NA,n-k-H,H)
+mae_3 <- matrix(NA,n-k-H,H)
+mae_4 <- matrix(NA,n-k-H,H)
+mae_5 <- matrix(NA,n-k-H,H)
+mae_6 <- matrix(NA,n-k-H,H)
+mae_7 <- matrix(NA,n-k-H,H)
+mae_8 <- matrix(NA,n-k-H,H)
+mae_9 <- matrix(NA,n-k-H,H)
+mae_10 <- matrix(NA,n-k-H,H)
+
+rsme_1 <- matrix(NA,n-k-H,H)
+rsme_2 <- matrix(NA,n-k-H,H)
+rsme_3 <- matrix(NA,n-k-H,H)
+rsme_4 <- matrix(NA,n-k-H,H)
+rsme_5 <- matrix(NA,n-k-H,H)
+rsme_6 <- matrix(NA,n-k-H,H)
+rsme_7 <- matrix(NA,n-k-H,H)
+rsme_8 <- matrix(NA,n-k-H,H)
+rsme_9 <- matrix(NA,n-k-H,H)
+rsme_10 <- matrix(NA,n-k-H,H)
+
+aicc_1 <- matrix(NA,n-k-H)
+aicc_2 <- matrix(NA,n-k-H)
+aicc_3 <- matrix(NA,n-k-H)
+aicc_4 <- matrix(NA,n-k-H)
+aicc_5 <- matrix(NA,n-k-H)
+aicc_6 <- matrix(NA,n-k-H)
+aicc_7 <- matrix(NA,n-k-H)
+aicc_8 <- matrix(NA,n-k-H)
+aicc_9 <- matrix(NA,n-k-H)
+aicc_1O <- matrix(NA,n-k-H)
+
+#For loop 96 times 
+for(i in 1:(n-k-H))
+{
+print(i)
+print(st + (i+H)/p)
+# Expanding Window 
+train_1 <- window(dft,end=st+i/p)
+trainw_1 <- window(wdft,end=st+i/p)
+traing_1 <- window(gts,end=st+i/p)
+
+tempts_1 <- window(wdft, end=st+i/p)
+temp_df_1 <- as.data.frame(as.numeric(tempts_1))
+temp_1 <- temp_df_1$`as.numeric(tempts_1)`
+dim(temp_1) <- c(length(temp_1),1)
+
+gasts_1 <- window(gts, end=st+i/p)
+gas_df_1 <- as.data.frame(as.numeric(gasts_1))
+gas_1 <- gas_df_1$`as.numeric(gasts_1)`
+dim(gas_1) <- c(length(gas_1),1)
+xreg_train_1 <- cbind(temp_1, gas_1)
+
+
+
+# Sliding Window
+train_2 <- window(dft,start=st+(i-k+1)/p, end=st+i/p)
+trainw_2 <- window(wdft,start=st+(i-k+1)/p, end=st+i/p)
+traing_2 <- window(gts,start=st+(i-k+1)/p, end=st+i/p)
+
+tempts_2 <- window(wdft, start=st+(i-k+1)/p, end=st+i/p)
+temp_df_2 <- as.data.frame(as.numeric(tempts_2))
+temp_2 <- temp_df_2$`as.numeric(tempts_2)`
+dim(temp_2) <- c(length(temp_2),1)
+
+gasts_2 <- window(gts, start=st+(i-k+1)/p, end=st+i/p)
+
+gas_df_2 <- as.data.frame(as.numeric(gasts_2))
+gas_2 <- gas_df_2$`as.numeric(gasts_2)`
+dim(gas_2) <- c(length(gas_2),1)
+
+xreg_train_2 <- cbind(temp_2, gas_2)
+
+# Set test
+test <- window(dft, start=st+(i+1)/p, end=st + (i+H)/p)
+
+tempts_test <- window(wdft,start=st+(i+1)/p, end=st + (i+H)/p)
+
+temp_test <- as.data.frame(as.numeric(tempts_test))
+temp_test <- temp_test$`as.numeric(tempts_test)`
+dim(temp_test) <- c(length(temp_test),1)
+
+gasts_test <- window(gts, start=st+(i+1)/p, end=st + (i+H)/p)
+gas_test <- as.data.frame(as.numeric(gasts_test))
+gas_test <- gas_test$`as.numeric(gasts_test)`
+dim(gas_test) <- c(length(gas_test),1)
+
+xreg_test <- cbind(temp_test, gas_test)
+# Arima (1,0,0)(0,1,1)[12] with drift 
+
+
+lambda <- 0.114068
+
+fit_1 <- Arima(train_1, order=c(1,0,2), seasonal=list(order=c(0,1,1), period=p),lambda = lambda,
+               include.drift=TRUE)
+fcast_1 <- forecast(fit_1, h=H)
+
+fit_2 <- Arima(train_2, order=c(1,0,2), seasonal=list(order=c(0,1,1), period=p),lambda = lambda,
+               include.drift=TRUE)
+fcast_2 <- forecast(fit_2, h=H)
+
+# ETS
+fit_3 <- ets(train_1, lambda = lambda_ts)
+fcast_3 <- forecast(fit_3, h=H)
+
+fit_4 <- ets(train_2, lambda = lambda_ts)
+fcast_4 <- forecast(fit_4, h=H)
+
+# VARS
+fit_5 <- VAR(cbind(train_1,trainw_1,traing_1), p = 12, type = "both",season=12, ic="aicc")
+fcast_5 <- forecast(fit_5, h=H)
+
+
+fit_6 <- VAR(cbind(train_2,trainw_2,traing_2), p = 12, type = "both",season=12,, ic="aicc")
+fcast_6 <- forecast(fit_6, h=H)
+
+#HW
+fit_7 <- hw(train_1,seasonal = "additive",h=H, damped = TRUE, lambda = lambda_ts)
+fcast_7 <- forecast(fit_7, h=H)
+
+fit_8 <- hw(train_2,seasonal = "additive",h=H, damped = TRUE, lambda = lambda_ts)
+fcast_8 <- forecast(fit_8, h=H)
+
+#tslm
+#my_df_ts <- data.frame(train_1, trainw_1,traing_1)
+#names(my_df_ts) <- c("visitors", "weather","gas")
+#fit_9 <- tslm(visitors ~ season + trend ,my_df_ts)
+#fcast_9 <- forecast(fit_9, h=H)
+
+#my_df_ts <- data.frame(train_2, trainw_2,traing_2)
+#names(my_df_ts) <- c("visitors", "weather","gas")
+#fit_10 <- tslm(visitors ~ season + trend ,my_df_ts)
+#fcast_10 <- forecast(fit_10, h=H)
+fit_9 <- Arima(y = train_1, order = c(1, 0, 2), seasonal = list(order = c(0, 1, 1),  period = 12),  xreg =xreg_train_1,  lambda = lambda_ts)
+fcast_9 <- forecast(fit_9, xreg = xreg_test, h=H)
+
+fit_10 <- Arima(y = train_2, order = c(1, 0, 2), seasonal = list(order = c(0, 1, 1),  period = 12),  xreg =xreg_train_2,  lambda = lambda_ts)
+fcast_10 <- forecast(fit_10, xreg = xreg_test, h=H)
+
+# Populate the MAE/RSME/AICC for all 4 models
+mae_1[i,1:length(test)] <- abs(fcast_1[['mean']]-test)
+mae_2[i,1:length(test)] <- abs(fcast_2[['mean']]-test)
+mae_3[i,1:length(test)] <- abs(fcast_3[['mean']]-test)
+mae_4[i,1:length(test)] <- abs(fcast_4[['mean']]-test)
+mae_5[i,1:length(test)] <- abs(fcast_5$forecast$train_1$mean-test)
+mae_6[i,1:length(test)] <- abs(fcast_6$forecast$train_2$mean-test)
+mae_7[i,1:length(test)] <- abs(fcast_7[['mean']]-test)
+mae_8[i,1:length(test)] <- abs(fcast_8[['mean']]-test)
+mae_9[i,1:length(test)] <- abs(fcast_9[['mean']]-test)
+mae_10[i,1:length(test)] <- abs(fcast_10[['mean']]-test)
+
+
+rsme_1[i,1:length(test)] <- (fcast_1[['mean']]-test)^2
+rsme_2[i,1:length(test)] <- (fcast_2[['mean']]-test)^2
+rsme_3[i,1:length(test)] <- (fcast_3[['mean']]-test)^2
+rsme_4[i,1:length(test)] <- (fcast_4[['mean']]-test)^2
+rsme_5[i,1:length(test)] <- (fcast_5$forecast$train_1$mean-test)^2
+rsme_6[i,1:length(test)] <- (fcast_6$forecast$train_2$mean-test)^2
+rsme_7[i,1:length(test)] <- (fcast_7[['mean']]-test)^2
+rsme_8[i,1:length(test)] <- (fcast_8[['mean']]-test)^2
+rsme_9[i,1:length(test)] <- (fcast_9[['mean']]-test)^2
+rsme_10[i,1:length(test)] <- (fcast_10[['mean']]-test)^2
+
+}
+```
+
+```{r graphs}
+#Plot MAE
+plot(1:24, colMeans(mae_1,na.rm=TRUE), type="l",col=1,xlab="horizon", ylab="MAE", ylim=c(20000,70000))
+lines(1:24, colMeans(mae_3,na.rm=TRUE), type="l",col=2)
+lines(1:24, colMeans(mae_5,na.rm=TRUE), type="l",col=3)
+lines(1:24, colMeans(mae_7,na.rm=TRUE), type="l",col=4)
+lines(1:24, colMeans(mae_9,na.rm=TRUE), type="l",col=5)
+
+legend("topright",legend=c("ARIMA - Expanding Window",
+                          'ETS - Expanding Window',
+                          'VAR - Expanding Window',
+                          'HW - Expanding Window',
+                          'ARIMAX - Expanding Window'),col=1:5,lty=1)
+
+
+plot(1:24, colMeans(mae_2,na.rm=TRUE), type="l",col=1,xlab="horizon", ylab="MAE", ylim=c(20000,70000))
+lines(1:24, colMeans(mae_4,na.rm=TRUE), type="l",col=2)
+lines(1:24, colMeans(mae_6,na.rm=TRUE), type="l",col=3)
+lines(1:24, colMeans(mae_8,na.rm=TRUE), type="l",col=4)
+lines(1:24, colMeans(mae_10,na.rm=TRUE), type="l",col=5)
+
+legend("topright",legend=c("ARIMA - Sliding Window",
+                          'ETS - Sliding Window',
+                          'VAR - Sliding Window',
+                          'HW - Sliding Window',
+                          'ARIMAX - Sliding Window'),col=1:5,lty=1)
+
+plot(1:24, colMeans(mae_1,na.rm=TRUE), type="l",col=1,xlab="horizon", ylab="MAE", ylim=c(20000,70000))
+lines(1:24, colMeans(mae_3,na.rm=TRUE), type="l",col=2)
+lines(1:24, colMeans(mae_5,na.rm=TRUE), type="l",col=3)
+lines(1:24, colMeans(mae_7,na.rm=TRUE), type="l",col=4)
+
+legend("topright",legend=c("ARIMA - Expanding Window",
+                          'ETS - Expanding Window',
+                          'VAR - Expanding Window',
+                          'HW - Expanding Window'),col=1:4,lty=1)
+
+
+plot(1:24, colMeans(mae_2,na.rm=TRUE), type="l",col=1,xlab="horizon", ylab="MAE", ylim=c(20000,70000))
+lines(1:24, colMeans(mae_4,na.rm=TRUE), type="l",col=2)
+lines(1:24, colMeans(mae_6,na.rm=TRUE), type="l",col=3)
+lines(1:24, colMeans(mae_8,na.rm=TRUE), type="l",col=4)
+
+
+legend("topright",legend=c("ARIMA - Sliding Window",
+                          'ETS - Sliding Window',
+                          'VAR - Sliding Window',
+                          'HW - Sliding Window'),col=1:4,lty=1)
+
+#Plot RSME by square rooting the squared differences
+plot(1:24, sqrt(colMeans(rsme_1,na.rm=TRUE)), type="l",col=1,xlab="horizon", ylab="RSME",ylim=c(40000,110000))
+lines(1:24, sqrt(colMeans(rsme_3,na.rm=TRUE)), type="l",col=2)
+lines(1:24, sqrt(colMeans(rsme_5,na.rm=TRUE)), type="l",col=3)
+lines(1:24, sqrt(colMeans(rsme_7,na.rm=TRUE)), type="l",col=4)
+lines(1:24, sqrt(colMeans(rsme_9,na.rm=TRUE)), type="l",col=5)
+
+legend("topright",legend=c("ARIMA - Expanding Window",
+                          'ETS - Expanding Window',
+                          'VAR - Expanding Window',
+                          'HW - Expanding Window',
+                          'ARIMAX - Expanding Window'),col=1:5,lty=1)
+
+
+plot(1:24, sqrt(colMeans(rsme_2,na.rm=TRUE)), type="l",col=1,xlab="horizon", ylab="RSME",ylim=c(40000,110000))
+lines(1:24, sqrt(colMeans(rsme_4,na.rm=TRUE)), type="l",col=2)
+lines(1:24, sqrt(colMeans(rsme_6,na.rm=TRUE)), type="l",col=3)
+lines(1:24, sqrt(colMeans(rsme_8,na.rm=TRUE)), type="l",col=4)
+lines(1:24, sqrt(colMeans(rsme_10,na.rm=TRUE)), type="l",col=5)
+
+legend("topright",legend=c("ARIMA - Sliding Window",
+                          'ETS - Sliding Window',
+                          'VAR - Sliding Window',
+                          'HW - Sliding Window',
+                          'ARIMAX - Sliding Window'),col=1:5,lty=1)
+
+
+#Plot RSME by square rooting the squared differences
+plot(1:24, sqrt(colMeans(rsme_1,na.rm=TRUE)), type="l",col=1,xlab="horizon", ylab="RSME",ylim=c(20000,150000))
+lines(1:24, sqrt(colMeans(rsme_3,na.rm=TRUE)), type="l",col=2)
+lines(1:24, sqrt(colMeans(rsme_5,na.rm=TRUE)), type="l",col=3)
+lines(1:24, sqrt(colMeans(rsme_7,na.rm=TRUE)), type="l",col=4)
+
+legend("topright",legend=c("ARIMA - Expanding Window",
+                          'ETS - Expanding Window',
+                          'VAR - Expanding Window',
+                          'HW - Expanding Window'),col=1:4,lty=1)
+
+
+plot(1:24, sqrt(colMeans(rsme_2,na.rm=TRUE)), type="l",col=1,xlab="horizon", ylab="RSME",ylim=c(20000,150000))
+lines(1:24, sqrt(colMeans(rsme_4,na.rm=TRUE)), type="l",col=2)
+lines(1:24, sqrt(colMeans(rsme_6,na.rm=TRUE)), type="l",col=3)
+lines(1:24, sqrt(colMeans(rsme_8,na.rm=TRUE)), type="l",col=4)
+
+legend("topright",legend=c("ARIMA - Sliding Window",
+                          'ETS - Sliding Window',
+                          'VAR - Sliding Window',
+                          'HW - Sliding Window'),col=1:4,lty=1)
+```
