@@ -1,9 +1,18 @@
-# Time Series
+# Time Series - Yellowstone Park
 
 Yellowstone is one of the most visited parks in the US with more than 4 million visitors a year. This translates in several problems: overcrowded spaces and insufficient resources. The goal of this project is to forecast the number of visitors per year to increase visitor’s satisfaction and, if possible better allocation of the park’s budget.
 
 ### Group Project:  Daniela Matinho (myself), Claire Zhang, Sneha Vasudevan and Tim Chang
 
+### This repertory contains:
+  - EDA of the data used (number of visitors of the Yellowstone park, average price of the gas in the US, weather data) and AMIRAX method and respective forecast using the 3 datsets
+  - PDF with the presention of the data, models used, forecasts and findings
+  - ETS and Holt-winters method and forecasts 
+  - sArima method and respective forecasts
+  - VAR method and forecast associated as well as the combination of forecasts (all models applied) using expanding and sliding window approaches
+  
+_______________________________________________________________________________________________________________________________________
+  
 ### Data description
 The data is from 1979 to 2018 and it is yearly data. There is a tiny upward trend and strong seasonality as we could expect from a national park. We split our data into train (39 years) and test (12 months) for the forecasts (why one year: this is a medium-term data so one to two years forecast should be enough).
 
