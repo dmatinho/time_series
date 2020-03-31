@@ -2,7 +2,7 @@
 
 Yellowstone is one of the most visited parks in the US with more than 4 million visitors a year. This translates in several problems: overcrowded spaces and insufficient resources. The goal of this project is to forecast the number of visitors per year to increase visitor’s satisfaction and, if possible better allocation of the park’s budget.
 
-### Group Project:  composed by myself, Daniela Matinho, Claire Zhang, Sneha Vasudevan and Tim Chang
+### Group Project:  Daniela Matinho (myself), Claire Zhang, Sneha Vasudevan and Tim Chang
 
 ### Data description
 The data is from 1979 to 2018 and it is yearly data. There is a tiny upward trend and strong seasonality as we could expect from a national park. We split our data into train (39 years) and test (12 months) for the forecasts (why one year: this is a medium-term data so one to two years forecast should be enough).
